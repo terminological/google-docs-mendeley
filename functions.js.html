@@ -1,0 +1,158 @@
+<!--
+Copyright (c) 2017 Terminological ltd
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script>
+
+$(function() {
+  
+  //set up folder picker
+  $('#folder-picker').change(function(opt) {
+    //console.log("Option clicked");
+    //clear existing list
+    $('#document-display')
+      .empty()
+      .append("<p>Loading...</p>");
+    //load documents for opt.value
+    
+    var value = '';
+    $( "select option:selected" ).each(function() {
+      value = $( this ).attr('value');
+      //console.log("Option clicked: "+$( this ).text());
+    });
+    //console.log("Option clicked: "+value);
+    folderId = value;
+    renderFolderContents(value);
+      
+  });
+  
+  //set up resync button
+  $('#mendeley-sync').click(function() {
+    window.localStorage.clear();
+    renderFolderContents(folderId);
+  });
+  
+  //render default folder (if present)
+  if (folderId != null) renderFolderContents(folderId);
+  
+});
+
+//get references in folder from mendelet
+//render the reference for the UI & cite button
+//add handle to cite button to call apps script
+function renderFolderContents(value) {
+  $.ajax({
+      url: "https://api.mendeley.com/folders/"+value+"/documents",
+      headers: {
+      "Authorization": "Bearer "+authToken,
+      "Accept": "application/vnd.mendeley-document.1+json"
+      },
+      dataType: 'json'})
+    //dataType: "application/vnd.mendeley-document.1+json"})
+    .done(function(documents) {
+        //console.log(documents);
+        $('#document-display').empty();
+        documents.forEach(function(document) {
+          getDocument(document.id, function(details) {
+            $('#document-display').append(renderDocument(details));
+            $('#'+details.id).click(function() {
+              //console.log(details);
+              google.script.run.insertCitationAtCursor(details.citation_key,details.id,details.bibtex);
+              google.script.host.editor.focus();
+            });
+          });
+        });
+      })
+      ;
+}
+
+//get bibtex from localstorage if present. 
+//If not get it from mendeley and cache it.
+//convert bibtex document to JSON object and
+//pass it to a callback
+function getDocument(id, callback) {
+  var bib = window.localStorage.getObject(id);
+  if (bib !== null) {
+    copyDoc(id,bib).forEach(function(tmp) {
+      callback(tmp);
+    });
+  } else {
+  $.ajax({
+    url: "https://api.mendeley.com/documents/"+id+"?view=bib",
+    headers: {
+      "Authorization": "Bearer "+authToken,
+      "Accept": "application/x-bibtex" //application/vnd.mendeley-document.1+json"
+    },
+    dataType: "text"})
+  .done(function(bib) {
+    window.localStorage.setObject(id,bib);
+    copyDoc(id, bib).forEach(function(tmp) {
+      callback(tmp);
+    });
+  })
+  .fail(function( jqXHR, textStatus, errorThrown ) {
+    //can't alert this to the user as could fire for everything... - needs to bubble back up.
+    //how do you collect errors in functional javascript and get a collection at the end?
+    //could append it to some kind of error console div and display that as a popup?
+    console.error(textStatus + " getting "+id);
+  })
+  ;
+  
+  }
+}
+
+//render a citation for the UI. 
+//this expects a JSON object based on the copyDoc function
+function renderDocument(d) {
+  return '<p>'+
+    '<button class="action" id="'+d.id+'");">Cite</button>&nbsp;&nbsp;'+
+    d.author+'. ('+d.year+') <b>'+d.title+'</b>, <span class="secondary">'+
+    d.source+'</span></p>';
+}
+
+//fill in default values, 
+function copyDoc(id, bib) {
+    var out = []
+    var tmpDocs = bibtexToObject(bib);
+    tmpDocs.forEach(function(tmpDoc) {
+      var docCopy = {};
+      docCopy.id = id;
+      docCopy.title = tmpDoc.entryTags.title.substring(1,tmpDoc.entryTags.title.length-1) || 'Unknown title';
+      docCopy.source = tmpDoc.entryTags.journal || 'Unknown source';
+      docCopy.year = tmpDoc.entryTags.year || 'Unknown year';
+      docCopy.author = tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : "") || 'Unknown author';
+      docCopy.citation_key = tmpDoc.citationKey;
+      docCopy.bibtex = bib;
+      out.push(docCopy);
+    });
+    return out;
+}
+
+Storage.prototype.setObject = function(key, value) {
+    this.setItem(key, JSON.stringify(value));
+}
+
+Storage.prototype.getObject = function(key) {
+    var value = this.getItem(key);
+    return value && JSON.parse(value);
+}
+
+</script>
