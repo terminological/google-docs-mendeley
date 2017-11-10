@@ -125,25 +125,40 @@ function renderDocument(d) {
   return '<p>'+
     '<button class="action" id="'+d.id+'");">Cite</button>&nbsp;&nbsp;'+
     d.author+'. ('+d.year+') <b>'+d.title+'</b>, <span class="secondary">'+
-    d.source+'</span></p>';
+    d.source+'</span>&nbsp;<a href="'+d.url+'">[link]</a></p>';
 }
 
 //fill in default values, 
 function copyDoc(id, bib) {
-    var out = []
+    var out = [];
     var tmpDocs = bibtexToObject(bib);
     tmpDocs.forEach(function(tmpDoc) {
       var docCopy = {};
       docCopy.id = id;
-      docCopy.title = tmpDoc.entryTags.title.substring(1,tmpDoc.entryTags.title.length-1) || 'Unknown title';
-      docCopy.source = tmpDoc.entryTags.journal || 'Unknown source';
-      docCopy.year = tmpDoc.entryTags.year || 'Unknown year';
-      docCopy.author = tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : "") || 'Unknown author';
+      docCopy.title = stripBraces(tmpDoc.entryTags.title || 'Unknown title');
+      docCopy.source = stripBraces(tmpDoc.entryTags.journal || 'Unknown source');
+      docCopy.year = stripBraces(tmpDoc.entryTags.year || 'Unknown year');
+      if (tmpDoc.entryTags.author != null) {
+        docCopy.author = stripBraces(tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : ""));
+      } else {
+        docCopy.author =  'Unknown author';
+      }
       docCopy.citation_key = tmpDoc.citationKey;
+      if (tmpDoc.entryTags.url != null) {
+        if (tmpDoc.entryTags.url.indexOf(" ") != -1)
+          docCopy.url = tmpDoc.entryTags.url.substring(0,tmpDoc.entryTags.url.indexOf(" "));
+        else 
+          docCopy.url = tmpDoc.entryTags.url;
+      }
       docCopy.bibtex = bib;
       out.push(docCopy);
     });
     return out;
+}
+
+function stripBraces(str) {
+  if (str == null) return null;
+  return str.replace("{","").replace("}","");
 }
 
 Storage.prototype.setObject = function(key, value) {

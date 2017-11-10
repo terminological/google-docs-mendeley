@@ -23,9 +23,9 @@ SOFTWARE.
 
 */
 
-// SCRIPT_ID = "18mPlo0gcCA7VY__MKfMsQrmymXdExt6a7uO4RY9dMrWv0Tsqix9YOhqo"
-// Mendeley redirect url = "https://script.google.com/macros/d/18mPlo0gcCA7VY__MKfMsQrmymXdExt6a7uO4RY9dMrWv0Tsqix9YOhqo/usercallback"
-// App secret is: XTEkTzk7EuPDuKL8
+// SCRIPT_ID = "1zmauW4WzNKGfjokSMgm6M_669Hnna5of_l-pfN0LDBPQc5u2XszXXRAZ"
+// Mendeley redirect url = "https://script.google.com/macros/d/1zmauW4WzNKGfjokSMgm6M_669Hnna5of_l-pfN0LDBPQc5u2XszXXRAZ/usercallback"
+// App secret is: nhyXkPKiFwaSpVLD
 
 /******************************************************************************
 * Apps script set up and utilites
@@ -101,9 +101,9 @@ function openLibrary() {
   mendeleyLogin();
   var docProperties = PropertiesService.getDocumentProperties();
   var linkedFolder = docProperties.getProperty('LINKED_FOLDER');
-  if (linkedFolder == null) {
-    openFolderChooser();
-  } else {
+//  if (linkedFolder == null) {
+//    openFolderChooser();
+//  } else {
     var mendeleyService = getMendeleyService();
     var template = HtmlService.createTemplateFromFile("citationsSidebar.html");
     //template.documents = getDocumentsInLinkedFolder(); 
@@ -114,7 +114,7 @@ function openLibrary() {
     var page = template.evaluate();
     page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library');
     DocumentApp.getUi().showSidebar(page);
-  }
+//  }
 }
 
 /******************************************************************************
@@ -137,7 +137,6 @@ function setCitationStyle(citationStyle) {
 */
 function linkDocumentToFolder(linkedFolder) {
   var docProperties = PropertiesService.getDocumentProperties();
-  Logger.log("linked folder changed to: "+linkedFolder);
   docProperties.setProperty('LINKED_FOLDER', linkedFolder);
 }
 
@@ -165,9 +164,11 @@ function mendeleyLogin() {
 function mendeleyLogout(){
   var ui = DocumentApp.getUi();
   var response = ui.alert('Logging out of all documents', 'Do you want to continue?', ui.ButtonSet.YES_NO);
+  var properties = PropertiesService.getScriptProperties();
+  var clientName = properties.getProperty('client_name');
   // Process the user's response.
-  if (response.getSelectedButton() == ui.Button.YES) {
-    OAuth2.createService('mendeley')
+  if (response == ui.Button.YES) {
+    OAuth2.createService(clientName)
       .setPropertyStore(PropertiesService.getUserProperties())
       .reset();
     DocumentApp.getUi().alert("Logged out of Mendeley");
@@ -181,11 +182,15 @@ function mendeleyLogout(){
 * see http://dev.mendeley.com/reference/topics/authorization_implicit.html
 */
 function getMendeleyService() {
-  return OAuth2.createService('mendeley')
+  var properties = PropertiesService.getScriptProperties();
+  var clientId = properties.getProperty('client_id');
+  var clientSecret = properties.getProperty('client_secret');
+  var clientName = properties.getProperty('client_name');
+  return OAuth2.createService(""+clientName)
       .setAuthorizationBaseUrl('https://api.mendeley.com/oauth/authorize')
       .setTokenUrl('https://api.mendeley.com/oauth/token')
-      .setClientId('4839')
-      .setClientSecret('XTEkTzk7EuPDuKL8')
+      .setClientId(""+clientId)
+      .setClientSecret(""+clientSecret)
       .setCallbackFunction('authCallback')
       .setPropertyStore(PropertiesService.getUserProperties())
       .setScope('all');
@@ -206,14 +211,12 @@ function authCallback(request) {
 */
 function getJsonFromUrl(url, type) {
   var mendeleyService = getMendeleyService();
-  Logger.log("requested url: "+ url);
   var response = UrlFetchApp.fetch(url, {
     'headers': {
       'Authorization': 'Bearer ' + mendeleyService.getAccessToken(),
       'Accept': 'application/'+type+'+json'
     }
   });
-  Logger.log(response);
   return JSON.parse(response);
 }
 
@@ -265,7 +268,6 @@ function mendeleySync() {
   var userProp = PropertiesService.getUserProperties();
   userProp.setProperty("LIBRARY_CONTENT", JSON.stringify(out));
   userProp.setProperty("LIBRARY_TS", new Date().getTime());
-  Logger.log(out);
   return out;
 }
 
@@ -284,7 +286,6 @@ function getFolders() {
     out = out.concat(group.folders);
   });
   out = out.sort(function(a,b) {return a.name.localeCompare(b.name);});
-  Logger.log(out);
   return out;
 }
 
@@ -516,10 +517,14 @@ function sanitiseBibtex(bib) {
     //DocumentApp.getUi().alert(JSON.stringify(tmpDocs));
     tmpDocs.forEach(function(tmpDoc) {
       var docCopy = {};
-      docCopy.title = tmpDoc.entryTags.title.substring(1,tmpDoc.entryTags.title.length-1) || 'Unknown title';
-      docCopy.source = tmpDoc.entryTags.journal || 'Unknown source';
-      docCopy.year = tmpDoc.entryTags.year || 'Unknown year';
-      docCopy.author = tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : "") || 'Unknown author';
+      docCopy.title = stripBraces(tmpDoc.entryTags.title || 'Unknown title');
+      docCopy.source = stripBraces(tmpDoc.entryTags.journal || 'Unknown source');
+      docCopy.year = stripBraces(tmpDoc.entryTags.year || 'Unknown year');
+      if (tmpDoc.entryTags.author != null) {
+        docCopy.author = stripBraces(tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : ""));
+      } else {
+        docCopy.author =  'Unknown author';
+      }
       docCopy.citation_key = tmpDoc.citationKey;
       if (tmpDoc.entryTags.url != null) {
         if (tmpDoc.entryTags.url.indexOf(" ") != -1)
@@ -532,20 +537,25 @@ function sanitiseBibtex(bib) {
     return out;
 }
 
+function stripBraces(str) {
+  if (str == null) return null;
+  return str.replace("{","").replace("}","");
+}
+
 /*************************************************************************
 * Citation sytling and menu options
 *************************************************************************/
 
 function citationStylesMenu() {
   return DocumentApp.getUi().createMenu('Insert / update bibliography')
-    .addItem('Harvard', 'doCitationStyleHarvard')       
-    .addItem('IEEE', 'doCitationStyleIEEE')
+    .addItem('Formatted', 'doCitationStyleHarvard')       
+    //.addItem('IEEE', 'doCitationStyleIEEE')
     .addItem('Raw latex', 'doCitationStyleLatex');
 }
 
 //set the formatting style for the different menus
 function doCitationStyleHarvard() { setCitationStyle('HARVARD'); insertOrUpdateBibliography();}
-function doCitationStyleIEEE() { setCitationStyle('IEEE'); insertOrUpdateBibliography();}
+// function doCitationStyleIEEE() { setCitationStyle('IEEE'); insertOrUpdateBibliography();}
 function doCitationStyleLatex() { setCitationStyle('LATEX'); insertOrUpdateBibliography();}
 
 // actually do something with the formatting etc.

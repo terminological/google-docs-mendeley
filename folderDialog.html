@@ -50,7 +50,7 @@ SOFTWARE.
     <? } ?>
     <hr/>
     </div>
-    <button class="action" onclick="google.script.run.linkDocumentToFolder(findFolderId()); google.script.run.openLibrary(); google.script.host.close();">Link...</button>
+    <button class="action" onclick="google.script.run.withSuccessHandler(google.script.host.close).linkDocumentToFolder(findFolderId()).openLibrary();">Link...</button>
     </div>
   </body>
 </html>
