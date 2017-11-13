@@ -8,6 +8,22 @@ It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every 
 
 The goal is to be good enough to get some basic references in your google doc before exporting it to latex to format it properly.
 
+![example usage](/MendeleyCitation.png)
+
+## Installation / Web store
+
+You add this to google docs via the web store:
+
+https://chrome.google.com/webstore/detail/mendeley-citation-plugin/pdgpkjbclanplbfncobpdppiapogjmej?authuser=0
+
+You will have a menu option under add-ons
+
+* login to mendeley using normal mendeley oauth workflow
+* for a given document link a mendeley folder from the main menu
+* open the mendeley library from the main menu. You should see your folder contents in a sidebar
+* click on cite button in sidebar to insert a reference at the cursor
+* insert a bibliography from the main menu to inser the bibliography at the end or (theoretically) update an existing bibliography
+
 ## FAQ
 
 None so far... update this document and send me a pull request.
@@ -29,20 +45,5 @@ types of citation (e.g. book, report etc.) will not produce ideal results.
 * Highest priority to add "export as Latex" function - will require google drive access and export document content, including tables, citations, plus image blobs to a google docs folder for import into e.g. overleaf where formatting can be done properly. Probably will not include equations.
 * Be able to see which references are cited in the sidebar, or more importantly which ones have not been.
 
-![example usage](/MendeleyCitation.png)
-
-## Installation / Web store
-
-You add this to google docs via the web store:
-
-https://chrome.google.com/webstore/detail/mendeley-citation-plugin/pdgpkjbclanplbfncobpdppiapogjmej?authuser=0
-
-You will have a menu option under add-ons
-
-* login to mendeley using normal mendeley oauth workflow
-* for a given document link a mendeley folder from the main menu
-* open the mendeley library from the main menu. You should see your folder contents in a sidebar
-* click on cite button in sidebar to insert a reference at the cursor
-* insert a bibliography from the main menu to inser the bibliography at the end or (theoretically) update an existing bibliography
 
 
