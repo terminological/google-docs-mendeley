@@ -41,6 +41,7 @@ function onOpen(e) {
       .addItem('Logout', 'mendeleyLogout')
       .addSeparator()
       .addItem('Set default folder', 'openFolderChooser')
+      .addItem('Clear default folder', 'clearDefaultFolder')
       .addItem('Open library', 'openLibrary')
       .addSeparator()
       .addSubMenu(citationStylesMenu())
@@ -200,9 +201,9 @@ function authCallback(request) {
   var mendeleyService = getMendeleyService();
   var isAuthorized = mendeleyService.handleCallback(request);
   if (isAuthorized) {
-    return HtmlService.createHtmlOutput('<html><head></head><body><p>Success! Close this window to continue</p><!--<script type="text/javascript">google.script.host.close();</script>--></body></html>');
+    return HtmlService.createHtmlOutput('<html><head><link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css"></head><body><p>Success! Close this window to continue</p><!--<script type="text/javascript">google.script.host.close();</script>--></body></html>');
   } else {
-    return HtmlService.createHtmlOutput('<html><head></head><body><p>Mendeley authorisation failed - '+mendeleyService.getLastError()+'.</p></body></html>');
+    return HtmlService.createHtmlOutput('<html><head><link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css"></head><body><p>Mendeley authorisation failed - '+mendeleyService.getLastError()+'.</p></body></html>');
   }
 }
 
@@ -218,6 +219,10 @@ function getJsonFromUrl(url, type) {
     }
   });
   return JSON.parse(response);
+}
+
+function clearDefaultFolder() {
+  refreshFolderAndGroupData();
 }
 
 /*
@@ -547,10 +552,10 @@ function stripBraces(str) {
 *************************************************************************/
 
 function citationStylesMenu() {
-  return DocumentApp.getUi().createMenu('Insert / update bibliography')
+  return DocumentApp.getUi().createMenu('Insert bibliography')
     .addItem('Formatted', 'doCitationStyleHarvard')       
     //.addItem('IEEE', 'doCitationStyleIEEE')
-    .addItem('Raw latex', 'doCitationStyleLatex');
+    .addItem('Latex', 'doCitationStyleLatex');
 }
 
 //set the formatting style for the different menus
