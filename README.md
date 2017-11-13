@@ -34,10 +34,10 @@ None so far... update this document and send me a pull request.
 types of citation (e.g. book, report etc.) will not produce ideal results.
 * in text citation styling is not perfect. Order and format of the citation is defined only on insertion order, and citation ranges are not supported.
 * Only a single non-standard citation style is supported and a raw latex style for export.
-* The plugin can only see citations within a mendeley folder.
-* The citations are not sensibly ordered in the sidebar.
+* The plugin can only see references within a mendeley folder.
+* The references are not sensibly ordered in the sidebar.
 * The bibliography placement defaults to the end of the document. It sometimes duplicates the bibliography, if it has been moved. If this happens the spare one can be deleted manually.
-* It doesn't seem possible to deep link to a mendeley web page for the article.
+* It doesn't seem possible to deep link to a mendeley web page for the reference.
 
 ## Future development
 
