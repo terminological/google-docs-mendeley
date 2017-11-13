@@ -22,7 +22,7 @@ You will have a menu option under add-ons
 * for a given document link a mendeley folder from the main menu
 * open the mendeley library from the main menu. You should see your folder contents in a sidebar
 * click on cite button in sidebar to insert a reference at the cursor
-* insert a bibliography from the main menu to inser the bibliography at the end or (theoretically) update an existing bibliography
+* insert a bibliography from the main menu to insert the bibliography at the end or (theoretically) update an existing bibliography
 
 ## FAQ
 
