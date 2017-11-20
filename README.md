@@ -24,9 +24,22 @@ You will have a menu option under add-ons
 * click on cite button in sidebar to insert a reference at the cursor
 * insert a bibliography from the main menu to insert the bibliography at the end or (theoretically) update an existing bibliography
 
-## FAQ
+## FAQ / Issues
 
-None so far... update this document and send me a pull request.
+### Folder sync issues
+
+It seems that the folder structure is not updating properly from the re-sync button on the sidebar. Re-syncing folder structure can also be done from the menu. Try the following:
+
+* Make sure you have at least one folder in your Mendeley library
+* Close the plug in side bar.
+* Select menu option: Add-ons -> Mendeley citation plugin -> Clear default folder
+* Select menu option: Add-ons -> Mendeley citation plugin -> Set default folder
+
+Hopefully this will now show the full list of folders.
+
+### Copy and paste
+
+You can't copy a block of text containing citations from one document to another and paste them into a new document and include them in the bibliography of the new document. I'll work on this but it just isn't possible at the moment.
 
 ## Known issues / limitations
 
@@ -34,7 +47,7 @@ None so far... update this document and send me a pull request.
 types of citation (e.g. book, report etc.) will not produce ideal results.
 * in text citation styling is not perfect. Order and format of the citation is defined only on insertion order, and citation ranges are not supported.
 * Only a single non-standard citation style is supported and a raw latex style for export.
-* The plugin can only see references within a mendeley folder.
+* The plugin can only see references within a mendeley folder. You must have at least one folder in your Mendeley library for the plugin to work.
 * The references are not sensibly ordered in the sidebar.
 * The bibliography placement defaults to the end of the document. It sometimes duplicates the bibliography, if it has been moved. If this happens the spare one can be deleted manually.
 * It doesn't seem possible to deep link to a mendeley web page for the reference.
