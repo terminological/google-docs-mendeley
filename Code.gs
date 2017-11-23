@@ -40,8 +40,6 @@ function onOpen(e) {
       .addItem('Login', 'mendeleyLogin')
       .addItem('Logout', 'mendeleyLogout')
       .addSeparator()
-      .addItem('Set default folder', 'openFolderChooser')
-      .addItem('Clear default folder', 'clearDefaultFolder')
       .addItem('Open library', 'openLibrary')
       .addSeparator()
       .addSubMenu(citationStylesMenu())
@@ -89,33 +87,17 @@ function include(filename) {
 
 
 
-function openFolderChooser() {
-  mendeleyLogin();
-  var template = HtmlService.createTemplateFromFile("folderDialog.html");
-  template.folders = getFolders();
-  var page = template.evaluate();
-  DocumentApp.getUi().showModalDialog(page, "Pick a default Mendeley folder for your document.");
-  //When user has selected UI will be dismissed & openLibrary called from the UI.
-}
-
 function openLibrary() {
   mendeleyLogin();
   var docProperties = PropertiesService.getDocumentProperties();
   var linkedFolder = docProperties.getProperty('LINKED_FOLDER');
-//  if (linkedFolder == null) {
-//    openFolderChooser();
-//  } else {
-    var mendeleyService = getMendeleyService();
-    var template = HtmlService.createTemplateFromFile("citationsSidebar.html");
-    //template.documents = getDocumentsInLinkedFolder(); 
-    template.token = mendeleyService.getAccessToken()
-    template.folders = getFolders();
-    template.linkedFolder = linkedFolder;
-    //template.folder = getJsonFromUrl('https://api.mendeley.com/folders/'+linkedFolder,'vnd.mendeley-folder.1');
-    var page = template.evaluate();
-    page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library');
-    DocumentApp.getUi().showSidebar(page);
-//  }
+  var mendeleyService = getMendeleyService();
+  var template = HtmlService.createTemplateFromFile("citationsSidebar.html");
+  template.token = mendeleyService.getAccessToken()
+  template.linkedFolder = linkedFolder;
+  var page = template.evaluate();
+  page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library');
+  DocumentApp.getUi().showSidebar(page);
 }
 
 /******************************************************************************
@@ -207,92 +189,6 @@ function authCallback(request) {
   }
 }
 
-/*
-* internal function simplifying getting content from mendeley, server side
-*/
-function getJsonFromUrl(url, type) {
-  var mendeleyService = getMendeleyService();
-  var response = UrlFetchApp.fetch(url, {
-    'headers': {
-      'Authorization': 'Bearer ' + mendeleyService.getAccessToken(),
-      'Accept': 'application/'+type+'+json'
-    }
-  });
-  return JSON.parse(response);
-}
-
-function clearDefaultFolder() {
-  refreshFolderAndGroupData();
-}
-
-/*
-* clear and reload cached folder and group data.
-*/ 
-function refreshFolderAndGroupData() {
-  var userProp = PropertiesService.getUserProperties();
-  userProp.deleteProperty("LIBRARY_CONTENT");
-  return mendeleySync();
-}
-
-/*
-* get cached user and group content if available. Otherwise load from mendeley
-*/
-function getMendeleyContent() {
-  var userProp = PropertiesService.getUserProperties();
-  var content = userProp.getProperty("LIBRARY_CONTENT");
-  var ts = userProp.getProperty("LIBRARY_TS");
-  if (content == null) { // || ts < (new Date().getTime() + 7*24*60*60*1000)) {
-    return mendeleySync();
-  } else {
-    return JSON.parse(content);
-  }
-}
-
-/*
-* Fetch group and folder data from mendeley, so we can create the folder picker UI
-* and the skeleton of the document library sidebar.
-* stores group and folder content in the users properties
-* saves retrieving this for different documents.
-*/
-function mendeleySync() {
-  var out = {};
-  out.documents = {};
-  out.folders = getJsonFromUrl('https://api.mendeley.com/folders', 'vnd.mendeley-folder.1');
-  out.folders = out.folders.sort(function(a,b) {return a.name.localeCompare(b.name);});
-  out.folders.forEach(function(folder) {
-    delete(folder.created);
-  });
-  out.groups = getJsonFromUrl('https://api.mendeley.com/groups', 'vnd.mendeley-group.1');
-  out.groups = out.groups.sort(function(a,b) {return a.name.localeCompare(b.name);});
-  out.groups.forEach(function(group) {
-    var groupfolders = getJsonFromUrl('https://api.mendeley.com/folders?group_id='+group.id, 'vnd.mendeley-folder.1');
-    groupfolders = groupfolders.sort(function(a,b) {return a.name.localeCompare(b.name);});
-    groupfolders.forEach(function(folder) {delete(folder.created);});
-    group.folders = groupfolders;
-  });
-  var userProp = PropertiesService.getUserProperties();
-  userProp.setProperty("LIBRARY_CONTENT", JSON.stringify(out));
-  userProp.setProperty("LIBRARY_TS", new Date().getTime());
-  return out;
-}
-
-/* 
-* get a list of folders
-* see http://dev.mendeley.com/methods/#folders
-*/
-function getFolders() {
-  var tmp = getMendeleyContent();
-  var out = tmp.folders;
-  var groups = tmp.groups;
-  groups.forEach(function(group) {
-    group.folders.forEach(function(folder) {
-      folder.name = group.name+" > "+folder.name;
-    });
-    out = out.concat(group.folders);
-  });
-  out = out.sort(function(a,b) {return a.name.localeCompare(b.name);});
-  return out;
-}
 
 /*************************************************************************
 * Document manipulation functions

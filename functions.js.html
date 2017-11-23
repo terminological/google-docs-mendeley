@@ -23,106 +23,211 @@ SOFTWARE.
 <script>
 
 $(function() {
-  
-  //set up folder picker
-  $('#folder-picker').change(function(opt) {
-    //console.log("Option clicked");
-    //clear existing list
-    $('#document-display')
-      .empty()
-      .append("<p>Loading...</p>");
-    //load documents for opt.value
-    
-    var value = '';
-    $( "select option:selected" ).each(function() {
-      value = $( this ).attr('value');
-      //console.log("Option clicked: "+$( this ).text());
+
+    setupFolderChooser();
+    //set up folder picker action
+    $('#folder-picker').change(function(opt) {
+        //console.log("Option clicked");
+        //clear existing list
+        $('#document-display')
+        .empty()
+        .append("<p>Loading...</p>");
+        //load documents for opt.value
+        var value = '';
+        $( "select option:selected" ).each(function() {
+        value = $( this ).attr('value');
+        //console.log("Option clicked: "+$( this ).text());
+        });
+        //console.log("Option clicked: "+value);
+        folderId = value;
+        google.script.run.linkDocumentToFolder(value);
+        renderFolderContents(value);
     });
-    //console.log("Option clicked: "+value);
-    folderId = value;
-    renderFolderContents(value);
-      
-  });
-  
-  //set up resync button
-  $('#mendeley-sync').click(function() {
-    window.localStorage.clear();
-    renderFolderContents(folderId);
-  });
-  
-  //render default folder (if present)
-  if (folderId != null) renderFolderContents(folderId);
-  
+
+    //set up resync button
+    $('#mendeley-sync').click(function() {
+        window.localStorage.clear();
+        setupFolderChooser();
+        renderFolderContents(folderId);
+    });
+
+    //render default folder (if present)
+    if (folderId != null) renderFolderContents(folderId);
+
 });
 
-//get references in folder from mendelet
+//set up folder picker content
+function setupFolderChooser() {
+    $('#folder-picker').empty();
+    getFolderList(function(folder) {
+        //insert folder sorted by folder.name
+        var found = false;
+        $('.mendeley-folder').each(function() {
+            var name = $(this).text();
+            if (name > folder.name) {
+                $(this).before('<option class="mendeley-folder" value="'+folder.id+'" '+(folder.id==folderId ? "selected" : "")+'>'+folder.name+'</option>');
+                found = true;
+                return false;
+            }
+        });
+        if (!found) $('#folder-picker').append('<option class="mendeley-folder" value="'+folder.id+'" '+(folder.id==folderId ? "selected" : "")+'>'+folder.name+'</option>');
+    });
+}
+
+function updateStoredFolder(newFolder) {
+    var folderList = window.localStorage.getObject('mendeley-folder-'+authToken);
+    if (folderList == null) folderList = [];
+    var match = false;
+    folderList.forEach(function(testFolder) {
+    if (newFolder.id == testFolder.id) match = true;
+    });
+    if (!match) {
+        folderList.push(newFolder);
+        window.localStorage.setObject('mendeley-folder-'+authToken,folderList);
+    }
+}
+
+function getFolderList(callback) {
+var folderList = window.localStorage.getObject('mendeley-folder-'+authToken);
+if (folderList !== null) {
+    folderList.forEach(function(folder) {callback(folder);});
+} else {
+
+    var folderList = [];
+    $.ajax({
+        url: "https://api.mendeley.com/folders",
+        headers: {
+        "Authorization": "Bearer "+authToken,
+        "Accept": "application/vnd.mendeley-folder.1+json"},
+        dataType: "json"})
+    .done(function(folders) {
+        folders.forEach(function(folder) {
+            updateStoredFolder(folder);
+            callback(folder);
+        });
+    });
+        
+    $.ajax({
+        url: "https://api.mendeley.com/groups",
+        headers: {
+        "Authorization": "Bearer "+authToken,
+        "Accept": "application/vnd.mendeley-group.1+json"
+        },
+        dataType: "json"})
+    .done(function(groups) {
+        
+        groups.forEach(function(group) {
+            $.ajax({
+                url: "https://api.mendeley.com/folders?group_id="+group.id,
+                headers: {
+                "Authorization": "Bearer "+authToken,
+                "Accept": "application/vnd.mendeley-folder.1+json"
+                },
+                dataType: "json"})
+            .done(function(folders) {
+                folders.forEach(function(folder) {
+                    folder.name = group.name+" > "+folder.name;
+                    updateStoredFolder(folder);
+                    callback(folder);
+                });
+            });
+        });
+        
+    })
+}
+}
+
+
+
+
+//get references in folder from mendeley
 //render the reference for the UI & cite button
 //add handle to cite button to call apps script
 function renderFolderContents(value) {
-  $.ajax({
-      url: "https://api.mendeley.com/folders/"+value+"/documents",
-      headers: {
-      "Authorization": "Bearer "+authToken,
-      "Accept": "application/vnd.mendeley-document.1+json"
-      },
-      dataType: 'json'})
-    //dataType: "application/vnd.mendeley-document.1+json"})
-    .done(function(documents) {
-        //console.log(documents);
+    var docList = window.localStorage.getObject('mendeley-documents-'+authToken+"-"+value);
+    if (docList !== null) {
         $('#document-display').empty();
-        documents.forEach(function(document) {
-          getDocument(document.id, function(details) {
-            $('#document-display').append(renderDocument(details));
-            $('#'+details.id).click(function() {
-              //console.log(details);
-              google.script.run.insertCitationAtCursor(details.citation_key,details.id,details.bibtex);
-              google.script.host.editor.focus();
-            });
-          });
-        });
-      })
-      ;
+        docList.forEach(function(document) {renderDocument(document);});
+    } else {
+        $.ajax({
+            url: "https://api.mendeley.com/folders/"+value+"/documents",
+            headers: {
+            "Authorization": "Bearer "+authToken,
+            "Accept": "application/vnd.mendeley-document.1+json"
+            },
+            dataType: 'json'})
+         .done(function(documents) {
+                //console.log(documents);
+                window.localStorage.setObject('mendeley-documents-'+authToken+"-"+value,documents);
+                $('#document-display').empty();
+                documents.forEach(function(document) {renderDocument(document);});
+         })
+        ;
+    }
 }
+
+function renderDocument(document) {
+    
+    getDocument(document.id, function(details) {
+        //insert into document sort documents here details.id is the key. 
+        //iterate over child nodes of $('document-display') selector is a child button id
+        var found = false;
+        $('.mendeley-cite').each(function() {
+            var paraEl = $(this);
+            var id = paraEl.attr('id');
+            if (id > details.citation_key) {
+                paraEl.before(renderCitation(details));
+                found = true;
+                return false;
+            }
+        });
+        //if we find one larger than current then insert before found item, otherwise insert at end
+        if (!found) $('#document-display').append(renderCitation(details));
+        $('#'+details.id).click(function() {
+        //console.log(details);
+        google.script.run.insertCitationAtCursor(details.citation_key,details.id,details.bibtex);
+        google.script.host.editor.focus();
+        });
+    });
+}
+
 
 //get bibtex from localstorage if present. 
 //If not get it from mendeley and cache it.
 //convert bibtex document to JSON object and
 //pass it to a callback
 function getDocument(id, callback) {
-  var bib = window.localStorage.getObject(id);
-  if (bib !== null) {
-    copyDoc(id,bib).forEach(function(tmp) {
-      callback(tmp);
-    });
-  } else {
-  $.ajax({
-    url: "https://api.mendeley.com/documents/"+id+"?view=bib",
-    headers: {
-      "Authorization": "Bearer "+authToken,
-      "Accept": "application/x-bibtex" //application/vnd.mendeley-document.1+json"
-    },
-    dataType: "text"})
-  .done(function(bib) {
-    window.localStorage.setObject(id,bib);
-    copyDoc(id, bib).forEach(function(tmp) {
-      callback(tmp);
-    });
-  })
-  .fail(function( jqXHR, textStatus, errorThrown ) {
-    //can't alert this to the user as could fire for everything... - needs to bubble back up.
-    //how do you collect errors in functional javascript and get a collection at the end?
-    //could append it to some kind of error console div and display that as a popup?
-    console.error(textStatus + " getting "+id);
-  })
-  ;
-  
-  }
+    var bib = window.localStorage.getObject(id);
+    if (bib !== null) {
+        copyDoc(id,bib).forEach(function(tmp) {
+        callback(tmp);
+        });
+    } else {
+        $.ajax({
+            url: "https://api.mendeley.com/documents/"+id+"?view=bib",
+            headers: {
+            "Authorization": "Bearer "+authToken,
+            "Accept": "application/x-bibtex" //application/vnd.mendeley-document.1+json"
+            },
+            dataType: "text"})
+        .done(function(bib) {
+            window.localStorage.setObject(id,bib);
+            copyDoc(id, bib).forEach(function(tmp) {
+                callback(tmp);
+            });})
+        .fail(function( jqXHR, textStatus, errorThrown ) {
+            //can't alert this to the user as could fire for everything... - needs to bubble back up.
+            //how do you collect errors in functional javascript and get a collection at the end?
+            //could append it to some kind of error console div and display that as a popup?
+            console.error(textStatus + " getting "+id);
+        });
+    }
 }
 
 //render a citation for the UI. 
 //this expects a JSON object based on the copyDoc function
-function renderDocument(d) {
-  return '<p>'+
+function renderCitation(d) {
+    return '<p class="mendeley-cite" id="'+d.citation_key+'">'+
     '<button class="action" id="'+d.id+'");">Cite</button>&nbsp;&nbsp;'+
     d.author+'. ('+d.year+') <b>'+d.title+'</b>, <span class="secondary">'+
     d.source+'</span>&nbsp;<a href="'+d.url+'">[link]</a></p>';
@@ -133,32 +238,32 @@ function copyDoc(id, bib) {
     var out = [];
     var tmpDocs = bibtexToObject(bib);
     tmpDocs.forEach(function(tmpDoc) {
-      var docCopy = {};
-      docCopy.id = id;
-      docCopy.title = stripBraces(tmpDoc.entryTags.title || 'Unknown title');
-      docCopy.source = stripBraces(tmpDoc.entryTags.journal || 'Unknown source');
-      docCopy.year = stripBraces(tmpDoc.entryTags.year || 'Unknown year');
-      if (tmpDoc.entryTags.author != null) {
+    var docCopy = {};
+    docCopy.id = id;
+    docCopy.title = stripBraces(tmpDoc.entryTags.title || 'Unknown title');
+    docCopy.source = stripBraces(tmpDoc.entryTags.journal || 'Unknown source');
+    docCopy.year = stripBraces(tmpDoc.entryTags.year || 'Unknown year');
+    if (tmpDoc.entryTags.author != null) {
         docCopy.author = stripBraces(tmpDoc.entryTags.author.substring(0,50)+(tmpDoc.entryTags.author.length>50 ? "..." : ""));
-      } else {
+    } else {
         docCopy.author =  'Unknown author';
-      }
-      docCopy.citation_key = tmpDoc.citationKey;
-      if (tmpDoc.entryTags.url != null) {
+    }
+    docCopy.citation_key = tmpDoc.citationKey;
+    if (tmpDoc.entryTags.url != null) {
         if (tmpDoc.entryTags.url.indexOf(" ") != -1)
-          docCopy.url = tmpDoc.entryTags.url.substring(0,tmpDoc.entryTags.url.indexOf(" "));
+        docCopy.url = tmpDoc.entryTags.url.substring(0,tmpDoc.entryTags.url.indexOf(" "));
         else 
-          docCopy.url = tmpDoc.entryTags.url;
-      }
-      docCopy.bibtex = bib;
-      out.push(docCopy);
+        docCopy.url = tmpDoc.entryTags.url;
+    }
+    docCopy.bibtex = bib;
+    out.push(docCopy);
     });
     return out;
 }
 
 function stripBraces(str) {
-  if (str == null) return null;
-  return str.replace("{","").replace("}","");
+if (str == null) return null;
+return str.replace("{","").replace("}","");
 }
 
 Storage.prototype.setObject = function(key, value) {

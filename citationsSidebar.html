@@ -44,11 +44,7 @@ var folderId = '<?=linkedFolder?>';
   <div class="block form-group">
     <div class="block form-group">
     <label for="folder-picker">Select a folder...</label>
-    <select id="folder-picker">
-    <? for (var i = 0; i < folders.length; i++) { var folder = folders[i];?>
-      <option value="<?=folder.id ?>" <?=(folder.id==linkedFolder ? "selected" : "")?>><?=folder.name?></option>
-    <? } ?>
-    </select>
+    <select id="folder-picker"></select>
     </div>
     
     <hr/>

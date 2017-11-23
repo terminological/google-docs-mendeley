@@ -19,14 +19,18 @@ https://chrome.google.com/webstore/detail/mendeley-citation-plugin/pdgpkjbclanpl
 You will have a menu option under add-ons
 
 * login to mendeley using normal mendeley oauth workflow
-* for a given document link a mendeley folder from the main menu
-* open the mendeley library from the main menu. You should see your folder contents in a sidebar
+* open the mendeley library from the main menu. Pick a folder from the drop down. You should see your folder contents in a sidebar
 * click on cite button in sidebar to insert a reference at the cursor
 * insert a bibliography from the main menu to insert the bibliography at the end or (theoretically) update an existing bibliography
 
 ## FAQ / Issues
 
 ### Folder sync issues
+
+The folder sync issues have been fixed but are awaiting release. There is now no need to link a folder to a document, this will happen
+automatically when you pick a folder in the sidebar. This has also fixed the ordering of items in the sidebar. This will be scheduled for release shortly.
+
+IN the meantime follow these instructions:
 
 It seems that the folder structure is not updating properly from the re-sync button on the sidebar. Re-syncing folder structure can also be done from the menu. Try the following:
 
@@ -48,7 +52,7 @@ types of citation (e.g. book, report etc.) will not produce ideal results.
 * in text citation styling is not perfect. Order and format of the citation is defined only on insertion order, and citation ranges are not supported.
 * Only a single non-standard citation style is supported and a raw latex style for export.
 * The plugin can only see references within a mendeley folder. You must have at least one folder in your Mendeley library for the plugin to work.
-* The references are not sensibly ordered in the sidebar.
+* The references are not sensibly ordered in the sidebar. << FIXED pending release
 * The bibliography placement defaults to the end of the document. It sometimes duplicates the bibliography, if it has been moved. If this happens the spare one can be deleted manually.
 * It doesn't seem possible to deep link to a mendeley web page for the reference.
 
