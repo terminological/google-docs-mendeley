@@ -4,13 +4,15 @@ Google docs app script to allow citations in google docs.
 
 THIS IS AN UNOFFICIAL EXTENSION and has no support from Mendeley. (Mendeley, if you are reading this you are welcome to take this over)
 
-It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this app makes to your document, or revert to earlier versions.
+It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this app makes to your document, or revert to earlier versions. If you find a bug (that is not already listed below) please [add it as an issue](https://github.com/terminological/google-docs-mendeley/issues).
 
-The goal is to be good enough to get some basic references in your google doc before exporting it to latex to format it properly.
+The goal is to be good enough to get some basic references in your google doc before exporting it to latex to format it properly. 
 
 ![example usage](/MendeleyCitation.png)
 
 ## Installation / Web store
+
+You need to have a mendeley web account with a username and password. You need to sync your references to the web. This should be automatic.
 
 You add this to google docs via the web store:
 

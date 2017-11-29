@@ -33,15 +33,9 @@ $(function() {
         .empty()
         .append("<p>Loading...</p>");
         //load documents for opt.value
-        var value = '';
-        $( "select option:selected" ).each(function() {
-        value = $( this ).attr('value');
-        //console.log("Option clicked: "+$( this ).text());
-        });
-        //console.log("Option clicked: "+value);
-        folderId = value;
-        google.script.run.linkDocumentToFolder(value);
-        renderFolderContents(value);
+        folderId = $("#folder-picker").val();
+        google.script.run.linkDocumentToFolder(folderId);
+        renderFolderContents(folderId);
     });
 
     //set up resync button
@@ -56,22 +50,42 @@ $(function() {
 
 });
 
+//TODO: convert these all to return deferred objects
 //set up folder picker content
 function setupFolderChooser() {
     $('#folder-picker').empty();
     getFolderList(function(folder) {
         //insert folder sorted by folder.name
         var found = false;
+        var tmp = null;
         $('.mendeley-folder').each(function() {
             var name = $(this).text();
             if (name > folder.name) {
-                $(this).before('<option class="mendeley-folder" value="'+folder.id+'" '+(folder.id==folderId ? "selected" : "")+'>'+folder.name+'</option>');
+                tmp = $('<option class="mendeley-folder" value="'+folder.id+'">'+folder.name+'</option>').insertBefore($(this));
                 found = true;
                 return false;
             }
         });
-        if (!found) $('#folder-picker').append('<option class="mendeley-folder" value="'+folder.id+'" '+(folder.id==folderId ? "selected" : "")+'>'+folder.name+'</option>');
+        if (!found) {
+            tmp = $('<option class="mendeley-folder" value="'+folder.id+'">'+folder.name+'</option>').appendTo($('#folder-picker'));
+        }
+        // console.log(folder.id+" - "+folderId);
+        if (folder.id==folderId) { 
+            tmp.prop('selected', true); 
+            // console.log($("#folder-picker").val());
+        }
     });
+    /* this approach to detect if a folder item has been removed does not work
+    this is because the folder picker is constructed asynronously and the value will always be null
+    if a folder has been deleted from mendeley we will still show likely show its contents
+    console.log($("#folder-picker").val());
+    if ($("#folder-picker").val() == null) {
+       $('.mendeley-folder:eq(0)').prop('selected', true);
+       folderId = $("#folder-picker").val();
+       console.log(folderId);
+       google.script.run.linkDocumentToFolder(folderId);
+    }
+    */
 }
 
 function updateStoredFolder(newFolder) {
@@ -93,7 +107,6 @@ if (folderList !== null) {
     folderList.forEach(function(folder) {callback(folder);});
 } else {
 
-    var folderList = [];
     $.ajax({
         url: "https://api.mendeley.com/folders",
         headers: {
@@ -126,7 +139,7 @@ if (folderList !== null) {
                 dataType: "json"})
             .done(function(folders) {
                 folders.forEach(function(folder) {
-                    folder.name = group.name+" > "+folder.name;
+                    folder.name = group.name+": "+folder.name;
                     updateStoredFolder(folder);
                     callback(folder);
                 });
@@ -144,25 +157,35 @@ if (folderList !== null) {
 //render the reference for the UI & cite button
 //add handle to cite button to call apps script
 function renderFolderContents(value) {
-    var docList = window.localStorage.getObject('mendeley-documents-'+authToken+"-"+value);
-    if (docList !== null) {
-        $('#document-display').empty();
-        docList.forEach(function(document) {renderDocument(document);});
+    if (value == null) {
+        $('#document-display')
+        .empty()
+        .append("<p>Pick a folder...</p>");
     } else {
-        $.ajax({
-            url: "https://api.mendeley.com/folders/"+value+"/documents",
-            headers: {
-            "Authorization": "Bearer "+authToken,
-            "Accept": "application/vnd.mendeley-document.1+json"
-            },
-            dataType: 'json'})
-         .done(function(documents) {
-                //console.log(documents);
-                window.localStorage.setObject('mendeley-documents-'+authToken+"-"+value,documents);
-                $('#document-display').empty();
-                documents.forEach(function(document) {renderDocument(document);});
-         })
-        ;
+        var docList = window.localStorage.getObject('mendeley-documents-'+authToken+"-"+value);
+        if (docList !== null) {
+            $('#document-display').empty();
+            docList.forEach(function(document) {renderDocument(document);});
+        } else {
+            $.ajax({
+                url: "https://api.mendeley.com/folders/"+value+"/documents",
+                headers: {
+                "Authorization": "Bearer "+authToken,
+                "Accept": "application/vnd.mendeley-document.1+json"
+                },
+                dataType: 'json'})
+            .done(function(documents) {
+                    //console.log(documents);
+                    window.localStorage.setObject('mendeley-documents-'+authToken+"-"+value,documents);
+                    $('#document-display').empty();
+                    documents.forEach(function(document) {renderDocument(document);});
+            }).fail(function( jqXHR, textStatus, errorThrown ) {
+                $('#document-display')
+                .empty()
+                .append("<p>There was a problem loading document list from Mendeley. Please switch to a different folder and resync.</p>");
+                console.error(textStatus + " getting folder "+value);
+            });
+        }
     }
 }
 
@@ -213,6 +236,7 @@ function getDocument(id, callback) {
         .done(function(bib) {
             window.localStorage.setObject(id,bib);
             copyDoc(id, bib).forEach(function(tmp) {
+                google.script.run.storeCitationKeyMendeleyId(tmp.citation_key, tmp.id); //store citation_key:mendeley_id pair
                 callback(tmp);
             });})
         .fail(function( jqXHR, textStatus, errorThrown ) {

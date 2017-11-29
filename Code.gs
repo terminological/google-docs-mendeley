@@ -42,8 +42,20 @@ function onOpen(e) {
       .addSeparator()
       .addItem('Open library', 'openLibrary')
       .addSeparator()
-      .addSubMenu(citationStylesMenu())
+      .addItem('Update / Insert bibliography', 'doCitationStyleHarvard')
+      // .addSeparator()
+      // .addItem('Update / Insert bibliography', 'doCitationStyleHarvard')
       .addToUi();
+}
+
+/** 
+* polyfill string.startsWith
+*/
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function(searchString, position){
+      position = position || 0;
+      return this.substr(position, searchString.length) === searchString;
+  };
 }
 
 /**
@@ -93,10 +105,10 @@ function openLibrary() {
   var linkedFolder = docProperties.getProperty('LINKED_FOLDER');
   var mendeleyService = getMendeleyService();
   var template = HtmlService.createTemplateFromFile("citationsSidebar.html");
-  template.token = mendeleyService.getAccessToken()
-  template.linkedFolder = linkedFolder;
+  template.token = mendeleyService.getAccessToken();
+  template.linkedFolder = linkedFolder || 'null';
   var page = template.evaluate();
-  page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library');
+  page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library').setWidth(400);
   DocumentApp.getUi().showSidebar(page);
 }
 
@@ -121,6 +133,52 @@ function setCitationStyle(citationStyle) {
 function linkDocumentToFolder(linkedFolder) {
   var docProperties = PropertiesService.getDocumentProperties();
   docProperties.setProperty('LINKED_FOLDER', linkedFolder);
+}
+
+/**
+* Called when:
+* LINKED_FOLDER is not set and a folder is selected in the sidebar UI to be linked
+* inputs: 
+* linkedFolder - a mendeleyId for a linked folder.
+*/
+function unlinkDocument() {
+  var docProperties = PropertiesService.getDocumentProperties();
+  docProperties.deleteProperty('LINKED_FOLDER');
+}
+
+/**
+* Any time a new bibtex document is downloaded we need to store a key to it so that if 
+* we lose the context (e.g. after a copy and paste) we can find the reference again
+*/
+function storeCitationKeyMendeleyId(citationKey, mendeleyId) {
+    var userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty('mendeley-'+citationKey,mendeleyId);
+}
+
+
+/**
+* Any time a new bibtex document is downloaded we need to store a key to it so that if 
+* we lose the context (e.g. after a copy and paste) we can find the reference again
+*/
+function getBibtexFromCitationKey(citationKey) {
+    var userProperties = PropertiesService.getUserProperties();
+    var docProperties = PropertiesService.getDocumentProperties();
+    if (docProperties.getProperty(citationKey) != null) { 
+        return docProperties.getProperty(citationKey);
+    } else {
+        var mendeleyId = userProperties.getProperty('mendeley-'+citationKey);
+      if (mendeleyId == null) return "@article{"+citationKey+",\n\ttitle={"+citationKey+" not found in library}\n}";
+        var mendeleyService = getMendeleyService();
+        var response = UrlFetchApp.fetch("https://api.mendeley.com/documents/"+mendeleyId+"?view=bib", {
+          muteHttpExceptions: true,
+          headers: {
+            'Authorization': 'Bearer ' + mendeleyService.getAccessToken(),
+            'Accept': 'application/x-bibtex'
+          }});
+if (response.getResponseCode() != 200) return "@article{"+citationKey+",\n\ttitle={"+citationKey+" not found in library}\n}";
+       docProperties.setProperty(citationKey,response.getContentText());
+       return response.getContentText();
+  }    
 }
 
 /******************************************************************************
@@ -204,8 +262,8 @@ function authCallback(request) {
 * not already there.
 */
 function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
+    //TODO: remove citation index. Adopt getLinks function
   var docProperties = PropertiesService.getDocumentProperties();
-  var citationIndex = parseInt(docProperties.getProperty('CITATION_INDEX')) || 1;
   var doc = DocumentApp.getActiveDocument();
   // store the bibtex from mendeley in the document, so we don;t have to retrieve it when
   // building the bibliography
@@ -229,10 +287,6 @@ function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
     // i.e. we need to update existing citation
     // step one find the named ranges for this URL and remove them. 
     // The URL contains an index for a named range name.
-    var currentIndex = parseInt(linkUrl.substring(linkUrl.indexOf("=")+1,linkUrl.indexOf("&")));
-    var namedRanges = doc.getNamedRanges('mendeley-cite-'+currentIndex);
-    // this removes the range (but not the content)
-    namedRanges.forEach(function(namedRange) {namedRange.remove();});
     // we are in a URL. find the start and end of this URL in the text
     var start = offset;
     do {
@@ -252,10 +306,6 @@ function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
     var newEl = doc.newPosition(currentEl, start+1).insertText(txt);
     // append the new citation onto the existing URL
     newEl.setLinkUrl(linkUrl+"|"+bibtexKey);
-    // recreate the named range so we can find it again when we come to build the bibliography
-    var rangeBuilder = doc.newRange();
-    rangeBuilder.addElement(newEl);
-    doc.addNamedRange('mendeley-cite-'+currentIndex, rangeBuilder.build());
     // tidy up and move cursor to end of the inserted citation
     insertSpaceMaybe(doc.getCursor());
     doc.setCursor(doc.newPosition(newEl,newEl.getText().length));
@@ -263,12 +313,7 @@ function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
   } else {
     //insert new reference with a unique citation index
     var textEl = doc.getCursor().insertText("[1 ref]");
-    textEl.setLinkUrl("http://bibtex?index="+(citationIndex+1)+"&cite="+bibtexKey);
-    docProperties.setProperty('CITATION_INDEX', citationIndex+1);
-    // create a named range for the citation
-    var rangeBuilder = doc.newRange();
-    rangeBuilder.addElement(textEl);
-    doc.addNamedRange('mendeley-cite-'+(citationIndex+1), rangeBuilder.build());
+    textEl.setLinkUrl("http://bibtex?cite="+bibtexKey);
     //tidy up and move cursor to end
     insertSpaceMaybe(doc.getCursor());
     doc.setCursor(doc.newPosition(textEl,textEl.getText().length));
@@ -303,103 +348,85 @@ function insertSpaceMaybe(pos) {
 * TODO: figure out how to format citation(s) / bibliography
 */
 function insertOrUpdateBibliography() {
-  var docProperties = PropertiesService.getDocumentProperties();
-  // create the bibtexToObject() function from BibtexParser.
-  // loadJSFromHTMLFile('bibtexParse.js.html');
-  var doc = DocumentApp.getActiveDocument();
   // find somewhere to stick bibliography
-  // if it has been run befor there shoudl be one named range called mendeley-bibliography
-  var bibliographyRanges = doc.getNamedRanges("mendeley-bibliography");
-  // otherwise our initial position is the last container.
-  var container = null;
-  var containerIndex = null;
-  // delete all existing content of named range 
-  // (should be zero or one unless some careless copy pasting has happened)
-  bibliographyRanges.forEach(function(range) {
-    // delete the content - wonder if this will change the indexes of later sections? 
-    // in theory this shoudln't matter as we will check those late.
-    range.getRange().getRangeElements().forEach(function(rangeElement) {
-      // find container that is child of body element for each range in our named range.
-      // containerIndex will be the first of these (hopefully only one anyway)
-      if (container == null) {
-        container = rangeElement.getElement();
-        while (container.getParent().getType() != DocumentApp.ElementType.BODY_SECTION) container = container.getParent();
-        containerIndex = doc.getBody().getChildIndex(container);
-      }
-      //not handling partial elements here. 
-      //If there is a partial it is not my fault - it must have been edited. It will be deleted
-      rangeElement.getElement().removeFromParent();
-    });
-    range.remove();
-  });
-  // we have a location for our bibliography in terms of a containerIndex within the document.
-  // or containerIndex is null - in whcih case let's append the bibliography at the end
-  // create new table at that index
-  // create a single row, and single cell
+  // if it has been run before there should be a bookmark in a table.
+
+  var docProperties = PropertiesService.getDocumentProperties();
   var citeTable = null;
-  if (containerIndex != null) {
-    citeTable = doc.getBody().insertTable(containerIndex);
-  } else {
-    citeTable = doc.getBody().appendTable(); //N.B. This method will also append an empty paragraph after the table, since Google Docs documents cannot end with a table.
+  var citeCell = null;
+
+  var tmpLinks = getLinks();
+  var biblioLink = null;
+  for (var i=0; i<tmpLinks.length; i++) {
+    if (tmpLinks[i].url.startsWith('#mendeley-')) {
+      biblioLink = tmpLinks[i];
+      break;
+    }
   }
-  citeTable.setBorderWidth(0);
-  var citeCell = citeTable.appendTableRow().appendTableCell();
+  
+  if (biblioLink != null) {
+    var biblioPosition = DocumentApp.getActiveDocument().newPosition(DocumentApp.getActiveDocument().getBody().editAsText(), biblioLink.start);
+    citeTable = biblioPosition.getElement();
+    while (citeTable != null && citeTable.getType() !== DocumentApp.ElementType.TABLE) citeTable = citeTable.getParent();
+    citeTable.clear();
+  } else {
+    //no bibliography table was found. create a new one at the end of the document
+    citeTable = DocumentApp.getActiveDocument().getBody().appendTable();
+    citeTable.setBorderWidth(0);
+  }
+  
+  citeCell = citeTable.appendTableRow().appendTableCell();
   citeCell.setPaddingLeft(0).setPaddingRight(0).setPaddingTop(0).setPaddingBottom(0);
-  doc.addNamedRange("mendeley-bibliography", doc.newRange().addElement(citeTable).build());
+  
   //?scan document to figure out order of citations in document creating a numeric map of citations
   // use document.getNamedRanges() and filter on range.getName()
   var citeMap = [];
-  doc.getNamedRanges()
-    //pick out named ranges which are citations
-    .filter(function(namedRange) {return (namedRange.getName().indexOf('mendeley-cite-') == 0);})
-    .forEach(function(citationRange) {
-      var rangeName = citationRange.getName();
-      var linkUrl = "";
-      var citeElPos = null;
-      //delete current citation in text. OMG this is weird.
-      citationRange.getRange().getRangeElements().forEach(function(rangeElement) {
-        var element = rangeElement.getElement();
-        var start = rangeElement.getStartOffset();
-        var end = rangeElement.getEndOffsetInclusive();
-        if (citeElPos == null) citeElPos = doc.newPosition(element, start);
-        if (element.editAsText) {
-          linkUrl = element.editAsText().getLinkUrl(start); 
-          //this could in theory go wrong if reference has been edited and now has mulitple URLs, 
-          //but user can delete if so so OK to fail. linkUrl will be empty and not get further processed
-          element.editAsText().deleteText(start,end);
-        }
-      });
-      //identify the references in the URL
-      var citesRefs = linkUrl.substring(linkUrl.indexOf('&cite=')+6).split("\|");
-      var citeText = "";
-      //pick the bibtex from Document storage
-      citesRefs.forEach(function(citeRef) {
-        // the bibtex for a citation is in the document store.
-        // placed there by the citation sidebar when cite button is clicked.
-        var bibtex = docProperties.getProperty(citeRef);
-        if (citeMap.indexOf(citeRef) == -1) {
-          // this citation has not been seen so far. we need to track it.
-          citeMap.push(citeRef);
-          // we can also take this opportunity to put it in the bibliography/
-          // insert the reference into a bibliography as a numbered list item
-          // this is where the formatting needs to happen. at the moment it is raw bibtex
-          insertBibliographyItem(citeCell, citeRef, citeMap.indexOf(citeRef)+1, bibtex);
+  var insOffset = 0;
+  getLinks().forEach(function(link) {
+      var linkUrl = link.url;
+      if (linkUrl.startsWith('http://bibtex?')) {
+        //identify the references in the URL
+        var citesRefs = linkUrl.substring(linkUrl.indexOf('cite=')+5).split("\|");
+        var citeText = "";
+        //pick the bibtex from Document storage
+        citesRefs.forEach(function(citeRef) {
+          // the bibtex for a citation is in the document store.
+          // placed there by the citation sidebar when cite button is clicked.
+          // if that doesn;t exist it will look up the mapping
+          if (citeMap.indexOf(citeRef) == -1) {
+            // this citation has not been seen so far. we need to track it.
+            citeMap.push(citeRef);
+          }
           
-        }
-        // construct the text for the citation in the text. Should be something like [1,2,5-6]
-        // but that is too hard for now.
-        var index = citeMap.indexOf(citeRef)+1;
-        citeText = citeText.length > 0 ? citeText+","+index : ""+index;
-        // for latex: citeText = citeText.length > 0 ? ","+citeRef : citeRef;
-      });
-      //Create the citation with the newly formatted text, add the link, and rename the range so we can find it again
-      //this is where different formatting is required.
-      var tmpEl = citeElPos.insertText("["+citeText+"]");
-      // for latex: var tmpEl = citeElPos.insertText("/cite{"+citeText+"}");
-      tmpEl.setLinkUrl(linkUrl);
-      tmpEl.setForegroundColor('#404040');
-      doc.addNamedRange(rangeName, doc.newRange().addElement(tmpEl).build());
-    });
+          // construct the text for the citation in the text. Should be something like [1,2,5-6]
+          // but that is too hard for now.
+          var index = citeMap.indexOf(citeRef)+1;
+          //TODO: get this list of indexes sorted ascending etc.
+          citeText = citeText.length > 0 ? citeText+","+index : ""+index;
+          //TODO: for latex: citeText = citeText.length > 0 ? ","+citeRef : citeRef;
+          
+        });
+        
+        //delete current citation in text and add new one.
+        var text = DocumentApp.getActiveDocument().getBody().editAsText();
+        var start = link.start+insOffset;
+        var end = link.endInclusive+insOffset;
+        citeText = "["+citeText+"]";
+        text.insertText(end+1,citeText);
+        text.setLinkUrl(end+1,end+citeText.length,linkUrl);
+        text.setForegroundColor(end+1,end+citeText.length,'#404040');
+        text.deleteText(start,end);
+        //track difference in lengths as this will affect where subsequent links start
+        insOffset = insOffset + citeText.length-(end+1-start);
+      }
+  });
+  
+  citeMap.forEach(function(citeRef) {
+    var index = citeMap.indexOf(citeRef)+1;
+    var bibtex = getBibtexFromCitationKey(citeRef);
+    insertBibliographyItem(citeCell, citeRef, index, bibtex);
+  });
+  
   // retire victorious, covered in glory.
   // could maybe do something with citemap here if needs be.
   // could store citemap and use it when inserting a new reference to create a correctly
@@ -440,39 +467,116 @@ function sanitiseBibtex(bib) {
 
 function stripBraces(str) {
   if (str == null) return null;
-  return str.replace("{","").replace("}","");
+  return str.replace("{","").replace("}","").replace("\\&","&");
+}
+
+/*************************************************************************
+* Utility functions
+*************************************************************************/
+
+function testGetLinks() {
+  getLinks().forEach(function(tmp) {
+    Logger.log(tmp.url+","+tmp.start+","+tmp.endInclusive);
+  });
+}
+
+
+/**
+* Scans the document using Body.editAsText for the position of links relative to 
+* the body element.
+*/
+function getLinks() {
+  var result = [];
+  var out = {};
+  var element = DocumentApp.getActiveDocument().getBody().editAsText();
+  var docLength = element.getText().length;
+  out.start = null;
+  out.endInclusive = null;
+  out.url = null;
+  var pos = 0;
+  while (pos < docLength) {
+    //move on a character
+    var tmp = element.getLinkUrl(pos);
+    if (tmp != null) {
+      // we have found a url
+      if (tmp != out.url) {
+        //it is a different URL
+        if (out.url == null) {
+          //it is a new url
+          //set the start point
+          out.start = pos;
+          out.url = tmp;
+        } else {
+          //there are two urls touching each other
+          //we need to finish the last one, and start another
+          out.endInclusive=pos-1;
+          result.push(out);
+          out = {};
+          out.start = pos;
+          out.url = tmp;
+          out.endInclusive = null;
+        }
+      } else {
+        //it is the same url as previously found
+        //continue in the main loop as we haven't found the end yet
+      }
+    } else {
+      //we have not found a url
+      if (out.url != null) {
+        //we have run off the end of a url
+        //we must finish the last one and clear the start point
+        out.endInclusive = pos-1;
+        result.push(out);
+        out = {};
+        out.start = null;
+        out.url = null;
+        out.endInclusive = null;
+      } else {
+        //we are nowhere near a URL.
+        //continue in the main loop until we find a url.
+      }
+    }
+    pos += 1;
+  }
+  if (out.url != null) {
+    // the document ends with a link.
+    out.endInclusive = docLength;
+    result.push(out);
+  }
+  return result;
 }
 
 /*************************************************************************
 * Citation sytling and menu options
 *************************************************************************/
 
-function citationStylesMenu() {
+/*function citationStylesMenu() {
   return DocumentApp.getUi().createMenu('Insert bibliography')
     .addItem('Formatted', 'doCitationStyleHarvard')       
     //.addItem('IEEE', 'doCitationStyleIEEE')
     .addItem('Latex', 'doCitationStyleLatex');
-}
+}*/
 
 //set the formatting style for the different menus
 function doCitationStyleHarvard() { setCitationStyle('HARVARD'); insertOrUpdateBibliography();}
 // function doCitationStyleIEEE() { setCitationStyle('IEEE'); insertOrUpdateBibliography();}
-function doCitationStyleLatex() { setCitationStyle('LATEX'); insertOrUpdateBibliography();}
+// function doCitationStyleLatex() { setCitationStyle('LATEX'); insertOrUpdateBibliography();}
 
 // actually do something with the formatting etc.
 function insertBibliographyItem(citeCell, bibtexId, citationIndex, bibtex) {
   var docProperties = PropertiesService.getDocumentProperties();
-  var citationStyle = docProperties.getProperty('CITATION_STYLE');
+  var userProperties = PropertiesService.getUserProperties();
+  var mendeleyId = userProperties.getProperty('mendeley-'+bibtexId);
   var bibjson = sanitiseBibtex(bibtex)[0];
-  if (citationStyle == 'LATEX') {
-    citeCell.appendParagraph(bibtex);
-  } else {
-    var listItem = citeCell.appendParagraph("tmp");
-    listItem.setText("["+citationIndex+".] ");
-    listItem.appendText(bibjson.author+". ");
-    listItem.appendText("("+bibjson.year+") ");
-    listItem.appendText(bibjson.title+", ").setBold(true);
-    listItem.appendText(bibjson.source).setBold(false).setItalic(true);
-    if (bibjson.url != null) listItem.appendText(" ").appendText("[link]").setItalic(false).setLinkUrl(bibjson.url);
+  var listItem = citeCell.appendParagraph("");
+  listItem.appendText("["+citationIndex+".] ").setLinkUrl('#mendeley-'+mendeleyId).setUnderline(false).setForegroundColor('#000000');
+  listItem.appendText(bibjson.author+". ");
+  listItem.appendText("("+bibjson.year+") ");
+  listItem.appendText(bibjson.title+", ").setBold(true);
+  listItem.appendText(bibjson.source).setBold(false).setItalic(true);
+  if (bibjson.url != null) {
+    listItem.appendText(" ");
+    listItem.appendText("[link]").setItalic(false).setLinkUrl(bibjson.url);
   }
 }
+

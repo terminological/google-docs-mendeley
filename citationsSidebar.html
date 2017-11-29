@@ -27,7 +27,7 @@ SOFTWARE.
 <!-- from https://developers.google.com/apps-script/add-ons/css -->
 <style>
 .branding-below {
-  bottom: 56px;
+  bottom: 60px;
   top: 0;
 }
 </style>
@@ -56,20 +56,17 @@ var folderId = '<?=linkedFolder?>';
       <p>Pick a folder...</p>
     </div>
     <hr/>
-    </div>
-    
   </div>
-
-  
+    
 </div>
 <!-- end scrolling area -->
 
 <div class="sidebar bottom">
-  <span class="gray">This plugin is not provided by Mendeley.</span>
+  <span class="gray">This plugin is not provided by Mendeley. <a href="https://goo.gl/SrKF7a">Click here</a> for help or to report an issue.</span>
 </div>
 
-<?!= include('bibtexParse.js.html'); ?>
-<?!= include('functions.js.html'); ?>  
+<?!=include('bibtexParse.js.html');?>
+<?!=include('functions.js.html');?>  
   </body>
 </html>
 
