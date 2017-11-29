@@ -310,6 +310,7 @@ function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
     insertSpaceMaybe(doc.getCursor());
     doc.setCursor(doc.newPosition(newEl,newEl.getText().length));
     newEl.setForegroundColor('#404040');
+    textEl.setUnderline(false);
   } else {
     //insert new reference with a unique citation index
     var textEl = doc.getCursor().insertText("[1 ref]");
@@ -318,6 +319,7 @@ function insertCitationAtCursor(bibtexKey, citationId, bibtex) {
     insertSpaceMaybe(doc.getCursor());
     doc.setCursor(doc.newPosition(textEl,textEl.getText().length));
     textEl.setForegroundColor('#404040');
+    textEl.setUnderline(false);
   }
 }
 
@@ -415,6 +417,7 @@ function insertOrUpdateBibliography() {
         text.insertText(end+1,citeText);
         text.setLinkUrl(end+1,end+citeText.length,linkUrl);
         text.setForegroundColor(end+1,end+citeText.length,'#404040');
+        text.setUnderline(end+1,end+citeText.length,false);
         text.deleteText(start,end);
         //track difference in lengths as this will affect where subsequent links start
         insOffset = insOffset + citeText.length-(end+1-start);
