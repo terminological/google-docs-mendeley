@@ -168,7 +168,7 @@ function renderFolderContents(value) {
             docList.forEach(function(document) {renderDocument(document);});
         } else {
             $.ajax({
-                url: "https://api.mendeley.com/folders/"+value+"/documents",
+                url: "https://api.mendeley.com/folders/"+value+"/documents?limit=500",
                 headers: {
                 "Authorization": "Bearer "+authToken,
                 "Accept": "application/vnd.mendeley-document.1+json"
@@ -182,7 +182,7 @@ function renderFolderContents(value) {
             }).fail(function( jqXHR, textStatus, errorThrown ) {
                 $('#document-display')
                 .empty()
-                .append("<p>There was a problem loading document list from Mendeley. Please switch to a different folder and resync.</p>");
+                .append("<p>There was a problem loading document list from Mendeley. Please switch to a different folder and resync. You may need to close the sidebar and reopen it</p>");
                 console.error(textStatus + " getting folder "+value);
             });
         }
@@ -227,7 +227,7 @@ function getDocument(id, callback) {
         });
     } else {
         $.ajax({
-            url: "https://api.mendeley.com/documents/"+id+"?view=bib",
+            url: "https://api.mendeley.com/documents/"+id+"?view=bib&limit=500",
             headers: {
             "Authorization": "Bearer "+authToken,
             "Accept": "application/x-bibtex" //application/vnd.mendeley-document.1+json"
