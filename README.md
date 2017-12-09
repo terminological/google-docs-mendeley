@@ -26,6 +26,10 @@ After installation you will have a new menu option under Add-ons. The basic work
 
 ## FAQ / Issues
 
+### Help! everything has disappeared from the sidebar...
+
+Don't panic! Close the sidebar and reopen it and it should come back. I'm not sure what causes it - seems to be transient if a document has never been used with the plugin before or there is a network error. Dunno.
+
 ### Insert Bibliography is slow
 
 Yes, it is... I've tried. Honest.
