@@ -106,7 +106,7 @@ function openLibrary() {
   var mendeleyService = getMendeleyService();
   var template = HtmlService.createTemplateFromFile("citationsSidebar.html");
   template.token = mendeleyService.getAccessToken();
-  template.linkedFolder = linkedFolder || 'null';
+  template.linkedFolder = linkedFolder || 'none';
   var page = template.evaluate();
   page.setSandboxMode(HtmlService.SandboxMode.IFRAME).setTitle('Citation library').setWidth(400);
   DocumentApp.getUi().showSidebar(page);
@@ -247,6 +247,9 @@ function authCallback(request) {
   }
 }
 
+function getUnlinkedRefs() {
+  
+}
 
 /*************************************************************************
 * Document manipulation functions
@@ -357,18 +360,25 @@ function insertOrUpdateBibliography() {
   var citeTable = null;
   var citeCell = null;
 
-  var tmpLinks = getLinks();
   var biblioLink = null;
-  for (var i=0; i<tmpLinks.length; i++) {
-    if (tmpLinks[i].url.startsWith('#mendeley-')) {
-      biblioLink = tmpLinks[i];
-      break;
+  var body = DocumentApp.getActiveDocument().getBody();
+  
+  var rangeElement = body.findElement(DocumentApp.ElementType.TEXT);
+  while (rangeElement != null && biblioLink == null) {
+    var tmpLinks = getLinks(rangeElement.getElement());
+    for (var i=0; i<tmpLinks.length; i++) {
+      if (tmpLinks[i].url.startsWith('#mendeley-')) {
+        biblioLink = tmpLinks[i];
+        break;
+      }
     }
+    rangeElement = body.findElement(DocumentApp.ElementType.TEXT, rangeElement);
   }
   
   if (biblioLink != null) {
-    var biblioPosition = DocumentApp.getActiveDocument().newPosition(DocumentApp.getActiveDocument().getBody().editAsText(), biblioLink.start);
-    citeTable = biblioPosition.getElement();
+    //var biblioPosition = DocumentApp.getActiveDocument().newPosition(rangeElement.getElement(), biblioLink.start);
+    //citeTable = biblioPosition.getElement();
+    citeTable = rangeElement.getElement();
     while (citeTable != null && citeTable.getType() !== DocumentApp.ElementType.TABLE) citeTable = citeTable.getParent();
     citeTable.clear();
   } else {
@@ -383,8 +393,12 @@ function insertOrUpdateBibliography() {
   //?scan document to figure out order of citations in document creating a numeric map of citations
   // use document.getNamedRanges() and filter on range.getName()
   var citeMap = [];
-  var insOffset = 0;
-  getLinks().forEach(function(link) {
+  
+  var rangeElement = body.findElement(DocumentApp.ElementType.TEXT);
+  
+  while (rangeElement != null) {
+    var insOffset = 0;
+    getLinks(rangeElement.getElement()).forEach(function(link) {
       var linkUrl = link.url;
       if (linkUrl.startsWith('http://bibtex?')) {
         //identify the references in the URL
@@ -410,9 +424,9 @@ function insertOrUpdateBibliography() {
         });
         
         //delete current citation in text and add new one.
-        var text = DocumentApp.getActiveDocument().getBody().editAsText();
         var start = link.start+insOffset;
         var end = link.endInclusive+insOffset;
+        var text = rangeElement.getElement();
         citeText = "["+citeText+"]";
         text.insertText(end+1,citeText);
         text.setLinkUrl(end+1,end+citeText.length,linkUrl);
@@ -422,7 +436,9 @@ function insertOrUpdateBibliography() {
         //track difference in lengths as this will affect where subsequent links start
         insOffset = insOffset + citeText.length-(end+1-start);
       }
-  });
+    });
+    rangeElement = body.findElement(DocumentApp.ElementType.TEXT, rangeElement);
+  }
   
   citeMap.forEach(function(citeRef) {
     var index = citeMap.indexOf(citeRef)+1;
@@ -473,80 +489,37 @@ function stripBraces(str) {
   return str.replace("{","").replace("}","").replace("\\&","&");
 }
 
-/*************************************************************************
-* Utility functions
-*************************************************************************/
-
-function testGetLinks() {
-  getLinks().forEach(function(tmp) {
-    Logger.log(tmp.url+","+tmp.start+","+tmp.endInclusive);
-  });
-}
-
-
-/**
-* Scans the document using Body.editAsText for the position of links relative to 
-* the body element.
-*/
-function getLinks() {
-  var result = [];
-  var out = {};
-  var element = DocumentApp.getActiveDocument().getBody().editAsText();
-  var docLength = element.getText().length;
-  out.start = null;
-  out.endInclusive = null;
-  out.url = null;
-  var pos = 0;
-  while (pos < docLength) {
-    //move on a character
-    var tmp = element.getLinkUrl(pos);
-    if (tmp != null) {
-      // we have found a url
-      if (tmp != out.url) {
-        //it is a different URL
-        if (out.url == null) {
-          //it is a new url
-          //set the start point
-          out.start = pos;
-          out.url = tmp;
-        } else {
-          //there are two urls touching each other
-          //we need to finish the last one, and start another
-          out.endInclusive=pos-1;
-          result.push(out);
-          out = {};
-          out.start = pos;
-          out.url = tmp;
-          out.endInclusive = null;
-        }
-      } else {
-        //it is the same url as previously found
-        //continue in the main loop as we haven't found the end yet
+function missingMendeleyReferences() {
+  Logger.log("missingMendeleyIds");
+  var body = DocumentApp.getActiveDocument().getBody();
+  var rangeElement = body.findElement(DocumentApp.ElementType.TEXT);
+  var userProperties = PropertiesService.getUserProperties();
+  var docProperties = PropertiesService.getDocumentProperties();
+  var missingMendeleyIds = [];
+  while (rangeElement != null) {
+    getLinks(rangeElement.getElement()).forEach(function(link) {
+      var linkUrl = link.url;
+      if (linkUrl.startsWith('http://bibtex?')) {
+        //identify the references in the URL
+        var citesRefs = linkUrl.substring(linkUrl.indexOf('cite=')+5).split("\|");
+        citesRefs.forEach(function(citationKey) {
+          if (docProperties.getProperty(citationKey) != null) { 
+            // not missing - ignore
+          } else {
+            var mendeleyId = userProperties.getProperty('mendeley-'+citationKey);
+            if (mendeleyId != null) {
+              missingMendeleyIds.push(mendeleyId);
+            } else {
+              // unresolvable - ignore
+            }
+          }
+        });
       }
-    } else {
-      //we have not found a url
-      if (out.url != null) {
-        //we have run off the end of a url
-        //we must finish the last one and clear the start point
-        out.endInclusive = pos-1;
-        result.push(out);
-        out = {};
-        out.start = null;
-        out.url = null;
-        out.endInclusive = null;
-      } else {
-        //we are nowhere near a URL.
-        //continue in the main loop until we find a url.
-      }
-    }
-    pos += 1;
+    });
+    rangeElement = body.findElement(DocumentApp.ElementType.TEXT, rangeElement);
   }
-  if (out.url != null) {
-    // the document ends with a link.
-    out.endInclusive = docLength;
-    result.push(out);
-  }
-  return result;
+  Logger.log(missingMendeleyIds);
+  return missingMendeleyIds;
 }
 
 /*************************************************************************

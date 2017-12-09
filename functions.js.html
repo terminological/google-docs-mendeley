@@ -36,6 +36,7 @@ $(function() {
         folderId = $("#folder-picker").val();
         google.script.run.linkDocumentToFolder(folderId);
         renderFolderContents(folderId);
+        fetchMissing();
     });
 
     //set up resync button
@@ -43,10 +44,12 @@ $(function() {
         window.localStorage.clear();
         setupFolderChooser();
         renderFolderContents(folderId);
+        fetchMissing();
     });
 
     //render default folder (if present)
     if (folderId != null) renderFolderContents(folderId);
+    fetchMissing();
 
 });
 
@@ -157,7 +160,7 @@ if (folderList !== null) {
 //render the reference for the UI & cite button
 //add handle to cite button to call apps script
 function renderFolderContents(value) {
-    if (value == null) {
+    if (value == null || value == 'none') {
         $('#document-display')
         .empty()
         .append("<p>Pick a folder...</p>");
@@ -168,7 +171,7 @@ function renderFolderContents(value) {
             docList.forEach(function(document) {renderDocument(document);});
         } else {
             $.ajax({
-                url: "https://api.mendeley.com/folders/"+value+"/documents",
+                url: "https://api.mendeley.com/folders/"+value+"/documents?limit=500",
                 headers: {
                 "Authorization": "Bearer "+authToken,
                 "Accept": "application/vnd.mendeley-document.1+json"
@@ -182,7 +185,7 @@ function renderFolderContents(value) {
             }).fail(function( jqXHR, textStatus, errorThrown ) {
                 $('#document-display')
                 .empty()
-                .append("<p>There was a problem loading document list from Mendeley. Please switch to a different folder and resync.</p>");
+                .append("<p>There was a problem loading document list from Mendeley. Please switch to a different folder and resync. You may need to close the sidebar and reopen it</p>");
                 console.error(textStatus + " getting folder "+value);
             });
         }
@@ -227,7 +230,7 @@ function getDocument(id, callback) {
         });
     } else {
         $.ajax({
-            url: "https://api.mendeley.com/documents/"+id+"?view=bib",
+            url: "https://api.mendeley.com/documents/"+id+"?view=bib&limit=500",
             headers: {
             "Authorization": "Bearer "+authToken,
             "Accept": "application/x-bibtex" //application/vnd.mendeley-document.1+json"
@@ -297,6 +300,18 @@ Storage.prototype.setObject = function(key, value) {
 Storage.prototype.getObject = function(key) {
     var value = this.getItem(key);
     return value && JSON.parse(value);
+}
+
+function fetchMissing() {
+  google.script.run
+    .withSuccessHandler(function(missingMendeleyIds) {
+      
+      missingMendeleyIds.forEach(function(missingMendeleyId) {
+        console.log("resolving element: "+missingMendeleyId);
+        getDocument(missingMendeleyId, function() {});
+      });
+    })
+    .missingMendeleyReferences();
 }
 
 </script>
