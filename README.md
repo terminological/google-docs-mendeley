@@ -4,9 +4,23 @@ A Google docs add-on to allow citations in google docs from Mendeley.
 
 THIS IS AN UNOFFICIAL EXTENSION and has no support from Mendeley. (Mendeley, if you are reading this you are welcome to take this over). It is the product of a few late nights.
 
-It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this add-on makes to your document, or revert to earlier versions. If you find a bug (that is not already listed below) please [add it as an issue](https://goo.gl/rQNPji).
+It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this add-on makes to your document, or revert to earlier versions. If you find a bug (that is not already listed below) please [add it as an issue](https://goo.gl/rQNPji). This plugin has limitations. Please read the website carefully (see link below) before using. It is a hobby project and not commercially supported in any way.
 
-The goal is to be good enough to get some basic references in your google doc before exporting it to latex to format it properly. The latex export is a planned enhancement.
+In the light of poor star ratings, and absence of any bug reports or feedback about them on github, I am not updating the publically facing plugin. If you want a solid citation manager experience I can recommend you use the alternatives paperpile (paid for) or colwiz (free) which can both do the job of reference management more efficiently, and you can migrate your Mendeley library easily. 
+
+This (final) release fixes a few issues:
+1) I've increased the speed and reliability of creating a bibliography.
+2) Searching for references when copy and pasted from a different document works better and should allow multiple people logged into multiple Mendeley libraries work together
+3) a couple of small workflow bugs
+
+The previous release fixed the following:
+1) Folders should now synchronise better with Mendeley
+2) You can now copy and past referenced text between documents.
+3) The bibliography can be cut & pasted to move it to a new place.
+4) Folder linking is now done via the sidebar.
+5) Lots of other minor irritations fixed.
+
+The goal is to be good enough to get some basic references in your google doc before exporting it to latex to format it properly. The latex export is a still a planned enhancement but I will not be releasing it into the public version.
 
 ![example usage](/MendeleyCitation.png)
 
@@ -32,7 +46,7 @@ Don't panic! Close the sidebar and reopen it and it should come back. I'm not su
 
 ### Insert Bibliography is slow
 
-Yes, it is... I've tried. Honest.
+If your document contains references that were inserted in a different document and copy pasted to the new one then the plugin needs to fetch those from your mendeley library, if it can. Sometimes this is slow, and sometimes not possible.
 
 ### Folder sync
 
