@@ -2,11 +2,13 @@
 
 A Google docs add-on to allow citations in google docs from Mendeley.
 
+
+
 THIS IS AN UNOFFICIAL EXTENSION and has no support from Mendeley. (Mendeley, if you are reading this you are welcome to take this over). It is the product of a few late nights.
 
-It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this add-on makes to your document, or revert to earlier versions. If you find a bug (that is not already listed below) please [add it as an issue](https://goo.gl/rQNPji). This plugin has limitations. Please read the website carefully (see link below) before using. It is a hobby project and not commercially supported in any way.
+It is not production quality software. If you want a solid citation manager experience I can recommend you use the alternatives paperpile (paid for) or colwiz (free) which can both do the job of reference management more efficiently, and you can migrate your Mendeley library easily. 
 
-In the light of poor star ratings, and absence of any bug reports or feedback about them on github, I am not updating the publically facing plugin. If you want a solid citation manager experience I can recommend you use the alternatives paperpile (paid for) or colwiz (free) which can both do the job of reference management more efficiently, and you can migrate your Mendeley library easily. 
+It is provided as is and with no warranty. It is ALPHA QUALITY and whilst every effort been made, you use it at your own risk. You should always be able to undo changes this add-on makes to your document, or revert to earlier versions. If you find a bug (that is not already listed below) please [add it as an issue](https://goo.gl/rQNPji). This plugin has limitations. Please read the website carefully (see link below) before using. It is a hobby project and not commercially supported in any way.
 
 This (final) release fixes a few issues:
 1) I've increased the speed and reliability of creating a bibliography.
