@@ -3,6 +3,11 @@
 A Google docs add-on to allow citations in google docs from Mendeley.
 
 
+THIS PROJECT IS RETIRED AND NO LONGER DEPLOYED ON THE CHROME WEB STORE. 
+
+PLEASE LOOK AT COLWIZ OR PAPERPILE FOR ALTERNATIVES.
+
+
 
 THIS IS AN UNOFFICIAL EXTENSION and has no support from Mendeley. (Mendeley, if you are reading this you are welcome to take this over). It is the product of a few late nights.
 
